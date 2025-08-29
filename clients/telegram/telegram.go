@@ -50,6 +50,35 @@ func (c *Client) Updates(offset int, limit int) ([]Update, error) {
 	return resp.Result, nil
 }
 
+// PollUpdates starts polling for updates and processes them
+func (c *Client) PollUpdates(processor *MessageProcessor) error {
+	offset := 0
+
+	for {
+		// Get updates
+		updates, err := c.Updates(offset, 100)
+		if err != nil {
+			return fmt.Errorf("failed to get updates: %w", err)
+		}
+
+		// Process each update
+		for _, update := range updates {
+			// Process the update
+			if err := processor.ProcessUpdate(update); err != nil {
+				fmt.Printf("Error processing update: %v\n", err)
+			}
+
+			// Update offset to avoid processing the same update again
+			if update.ID >= offset {
+				offset = update.ID + 1
+			}
+		}
+
+		// Sleep for a bit before polling again
+		time.Sleep(1 * time.Second)
+	}
+}
+
 func (c *Client) SendMessage(chatID int64, text string) error {
 	q := url.Values{}
 	q.Add("chat_id", strconv.FormatInt(chatID, 10))

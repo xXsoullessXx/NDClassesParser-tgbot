@@ -20,7 +20,7 @@ type Parser struct {
 func New() Parser {
 	return Parser{
 		client:  web.New(),
-		timeout: 20 * time.Second, // Default timeout of 60 seconds
+		timeout: 30 * time.Second, // Default timeout of 60 seconds
 	}
 }
 
