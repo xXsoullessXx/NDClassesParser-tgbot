@@ -1,18 +1,32 @@
 package main
 
 import (
-	"fmt"
+	"flag"
 	"log"
 	"os"
 
 	"NDClasses/clients/checker"
 	"NDClasses/clients/database"
+	"NDClasses/clients/logger"
 	"NDClasses/clients/telegram"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Define command-line flags
+	debugMode := flag.Bool("debug", false, "Enable debug mode to see all parser actions")
+	flag.Parse()
+
+	// Create logger based on debug mode flag
+	logger := logger.New(*debugMode)
+
+	// Log startup message
+	logger.Info("Starting ND Classes Parser Bot")
+	if *debugMode {
+		logger.Info("Debug mode enabled")
+	}
+
 	// Load environment variables from .env file
 	err := godotenv.Load()
 	if err != nil {
@@ -35,14 +49,14 @@ func main() {
 	TGclient := telegram.New("api.telegram.org", botToken)
 
 	// Create message processor
-	processor := telegram.NewMessageProcessor(&TGclient, db)
+	processor := telegram.NewMessageProcessor(&TGclient, db, logger)
 
 	// Create and start checker service
-	checker := checker.New(db, TGclient)
+	checker := checker.New(db, TGclient, logger)
 	checker.Start()
 
 	// Start polling for updates
-	fmt.Println("Starting bot polling...")
+	logger.Info("Starting bot polling...")
 	if err := TGclient.PollUpdates(processor); err != nil {
 		log.Fatalf("Error polling updates: %v", err)
 	}

@@ -1,11 +1,14 @@
 package checker
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"NDClasses/clients/database"
+	"NDClasses/clients/logger"
 	"NDClasses/clients/ndparser"
 	"NDClasses/clients/telegram"
 )
@@ -15,14 +18,16 @@ type Checker struct {
 	db     *database.Database
 	parser ndparser.Parser
 	client telegram.Client
+	logger *logger.Logger
 }
 
 // New creates a new checker
-func New(db *database.Database, client telegram.Client) *Checker {
+func New(db *database.Database, client telegram.Client, logger *logger.Logger) *Checker {
 	return &Checker{
 		db:     db,
-		parser: ndparser.New(),
+		parser: ndparser.New(logger),
 		client: client,
+		logger: logger,
 	}
 }
 
@@ -35,8 +40,8 @@ func (c *Checker) Start() {
 				log.Printf("Error checking tracked CRNs: %v", err)
 			}
 
-			// Wait for 5 minutes before checking again
-			time.Sleep(5 * time.Minute)
+			// Wait for 3 minutes before checking again
+			time.Sleep(3 * time.Minute)
 		}
 	}()
 }
@@ -51,36 +56,51 @@ func (c *Checker) checkAllTrackedCRNs() error {
 
 	// Keep track of users we've already notified to avoid duplicate messages
 	notifiedUsers := make(map[int64]bool)
+	var mu sync.Mutex
 
 	// Check each CRN
+	wg := sync.WaitGroup{}
 	for _, crn := range trackedCRNs {
+		wg.Add(1)
 		// Check class availability
-		class, err := c.parser.SearchClass(crn.CRN)
-		if err != nil {
-			log.Printf("Error checking class %s: %v", crn.CRN, err)
-			continue
-		}
-
-		// If seats are available and we haven't notified this user yet
-		if class.Seats > 0 && !notifiedUsers[crn.UserID] {
-			// Get user by ID
-			user, err := c.db.GetUserByID(crn.UserID)
+		go func(crn database.TrackedCRN) {
+			defer wg.Done()
+			class, err := c.parser.SearchClass(context.Background(), crn.CRN)
 			if err != nil {
-				log.Printf("Error getting user %d: %v", crn.UserID, err)
-				continue
+				log.Printf("Error checking class %s: %v", crn.CRN, err)
+				return
 			}
 
-			// Send notification
-			message := fmt.Sprintf("Good news! Class %s (%s) now has %d seat(s) available.",
-				crn.CRN, crn.Title, class.Seats)
-			if err := c.client.SendMessage(user.TelegramID, message); err != nil {
-				log.Printf("Error sending message to user %d: %v", user.TelegramID, err)
-			}
+			// If seats are available and we haven't notified this user yet
+			mu.Lock()
+			alreadyNotified := notifiedUsers[crn.UserID]
+			mu.Unlock()
 
-			// Mark user as notified
-			notifiedUsers[crn.UserID] = true
-		}
+			if class.Seats > 0 && !alreadyNotified {
+				// Get user by ID
+				user, err := c.db.GetUserByID(crn.UserID)
+				if err != nil {
+					log.Printf("Error getting user %d: %v", crn.UserID, err)
+					return
+				}
+
+				// Send notification
+				message := fmt.Sprintf("Good news! Class %s (%s) now has %d seat(s) available.",
+					crn.CRN, crn.Title, class.Seats)
+				if err := c.client.SendMessage(user.TelegramID, message); err != nil {
+					log.Printf("Error sending message to user %d: %v", user.TelegramID, err)
+				}
+
+				// Mark user as notified
+				mu.Lock()
+				notifiedUsers[crn.UserID] = true
+				mu.Unlock()
+			}
+		}(crn)
 	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
 
 	return nil
 }
