@@ -62,7 +62,12 @@ func (p *MessageProcessor) processCommand(chatID int64, command string) error {
 	case "/help":
 		return p.client.SendMessage(chatID, "Available commands:\n/start - Start the bot\n/help - Show this help message\n/add CRN - Add a class to track\n/remove CRN - Stop tracking a class\n/list - List all tracked classes\n/check CRN - Check class availability now")
 	case "/list":
-		return p.listTrackedCRNs(chatID, user.ID)
+		go func() {
+			if err := p.listTrackedCRNs(chatID, user.ID); err != nil {
+				fmt.Printf("Error listing CRNs: %v\n", err)
+			}
+		}()
+		return nil
 	default:
 		// Check if it's a command with arguments
 		if strings.HasPrefix(command, "/add ") {
@@ -71,7 +76,12 @@ func (p *MessageProcessor) processCommand(chatID int64, command string) error {
 			return nil
 		} else if strings.HasPrefix(command, "/remove ") {
 			crn := strings.TrimSpace(strings.TrimPrefix(command, "/remove "))
-			return p.removeTrackedCRN(chatID, user.ID, crn)
+			go func() {
+				if err := p.removeTrackedCRN(chatID, user.ID, crn); err != nil {
+					fmt.Printf("Error removing CRN: %v\n", err)
+				}
+			}()
+			return nil
 		} else if strings.HasPrefix(command, "/check ") {
 			crn := strings.TrimSpace(strings.TrimPrefix(command, "/check "))
 			p.client.SendMessage(chatID, "Checking...")
@@ -89,7 +99,19 @@ func (p *MessageProcessor) processCommand(chatID int64, command string) error {
 
 // addTrackedCRN adds a CRN to the user's tracking list
 func (p *MessageProcessor) addTrackedCRN(chatID int64, userID int64, crn string) error {
+	// Check if CRN is already being tracked
+	crns, err := p.db.GetUserTrackedCRNs(userID)
+	if err != nil {
+		return p.client.SendMessage(chatID, fmt.Sprintf("Error checking tracked CRNs: %v", err))
+	}
+	for _, tracked := range crns {
+		if tracked.CRN == crn {
+			return p.client.SendMessage(chatID, fmt.Sprintf("CRN %s is already in your tracking list.", crn))
+		}
+	}
+
 	// Check class availability to get the title
+	err = p.client.SendMessage(chatID, "Adding...")
 	class, err := p.parser.SearchClass(context.Background(), crn)
 	if err != nil {
 		return p.client.SendMessage(chatID, fmt.Sprintf("Error checking class: %v", err))
@@ -111,8 +133,24 @@ func (p *MessageProcessor) addTrackedCRN(chatID int64, userID int64, crn string)
 
 // removeTrackedCRN removes a CRN from the user's tracking list
 func (p *MessageProcessor) removeTrackedCRN(chatID int64, userID int64, crn string) error {
+	// Check if CRN is being tracked
+	crns, err := p.db.GetUserTrackedCRNs(userID)
+	if err != nil {
+		return p.client.SendMessage(chatID, fmt.Sprintf("Error checking tracked CRNs: %v", err))
+	}
+	found := false
+	for _, tracked := range crns {
+		if tracked.CRN == crn {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return p.client.SendMessage(chatID, fmt.Sprintf("CRN %s is not in your tracking list.", crn))
+	}
+
 	// Remove CRN from database
-	err := p.db.RemoveTrackedCRN(userID, crn)
+	err = p.db.RemoveTrackedCRN(userID, crn)
 	if err != nil {
 		return p.client.SendMessage(chatID, fmt.Sprintf("Error removing CRN from tracking list: %v", err))
 	}

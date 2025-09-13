@@ -61,12 +61,14 @@ func (c *Client) PollUpdates(processor *MessageProcessor) error {
 			return fmt.Errorf("failed to get updates: %w", err)
 		}
 
-		// Process each update
+		// Process each update asynchronously
 		for _, update := range updates {
-			// Process the update
-			if err := processor.ProcessUpdate(update); err != nil {
-				fmt.Printf("Error processing update: %v\n", err)
-			}
+			// Launch goroutine to process the update
+			go func(u Update) {
+				if err := processor.ProcessUpdate(u); err != nil {
+					fmt.Printf("Error processing update: %v\n", err)
+				}
+			}(update)
 
 			// Update offset to avoid processing the same update again
 			if update.ID >= offset {

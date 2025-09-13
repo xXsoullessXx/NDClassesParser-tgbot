@@ -31,6 +31,7 @@ func New(logger *logger.Logger) Parser {
 func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	headless := !p.logger.IsDebugMode() // Headless in normal mode, visible in debug mode
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath("/usr/bin/chromium-browser"),                                     // Path to Chromium in Alpine
 		chromedp.Flag("headless", headless),                                                // Show browser in debug mode
 		chromedp.Flag("disable-gpu", false),                                                // Включить GPU (если нужно)
 		chromedp.Flag("ignore-certificate-errors", true),                                   // Игнорировать ошибки сертификатов
