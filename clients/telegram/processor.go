@@ -1,10 +1,12 @@
 package telegram
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"NDClasses/clients/database"
+	"NDClasses/clients/logger"
 	"NDClasses/clients/ndparser"
 )
 
@@ -13,14 +15,16 @@ type MessageProcessor struct {
 	client *Client
 	parser ndparser.Parser
 	db     *database.Database
+	logger *logger.Logger
 }
 
 // NewMessageProcessor creates a new message processor
-func NewMessageProcessor(client *Client, db *database.Database) *MessageProcessor {
+func NewMessageProcessor(client *Client, db *database.Database, logger *logger.Logger) *MessageProcessor {
 	return &MessageProcessor{
 		client: client,
-		parser: ndparser.New(),
+		parser: ndparser.New(logger),
 		db:     db,
+		logger: logger,
 	}
 }
 
@@ -63,18 +67,21 @@ func (p *MessageProcessor) processCommand(chatID int64, command string) error {
 		// Check if it's a command with arguments
 		if strings.HasPrefix(command, "/add ") {
 			crn := strings.TrimSpace(strings.TrimPrefix(command, "/add "))
-			return p.addTrackedCRN(chatID, user.ID, crn)
+			go p.addTrackedCRN(chatID, user.ID, crn)
+			return nil
 		} else if strings.HasPrefix(command, "/remove ") {
 			crn := strings.TrimSpace(strings.TrimPrefix(command, "/remove "))
 			return p.removeTrackedCRN(chatID, user.ID, crn)
 		} else if strings.HasPrefix(command, "/check ") {
 			crn := strings.TrimSpace(strings.TrimPrefix(command, "/check "))
 			p.client.SendMessage(chatID, "Checking...")
-			return p.checkClassAvailability(chatID, crn)
+			go p.checkClassAvailability(chatID, crn)
+			return nil
 		} else if strings.HasPrefix(command, "/check_") {
 			crn := strings.TrimPrefix(command, "/check_")
 			p.client.SendMessage(chatID, "Checking...")
-			return p.checkClassAvailability(chatID, crn)
+			go p.checkClassAvailability(chatID, crn)
+			return nil
 		}
 		return p.client.SendMessage(chatID, "Unknown command. Type /help for available commands.")
 	}
@@ -83,7 +90,7 @@ func (p *MessageProcessor) processCommand(chatID int64, command string) error {
 // addTrackedCRN adds a CRN to the user's tracking list
 func (p *MessageProcessor) addTrackedCRN(chatID int64, userID int64, crn string) error {
 	// Check class availability to get the title
-	class, err := p.parser.SearchClass(crn)
+	class, err := p.parser.SearchClass(context.Background(), crn)
 	if err != nil {
 		return p.client.SendMessage(chatID, fmt.Sprintf("Error checking class: %v", err))
 	}
@@ -143,7 +150,7 @@ func (p *MessageProcessor) processMessage(chatID int64, text string) error {
 // checkClassAvailability checks the availability of a class by CRN
 func (p *MessageProcessor) checkClassAvailability(chatID int64, crn string) error {
 	// Use the ND parser to check class availability
-	class, err := p.parser.SearchClass(crn)
+	class, err := p.parser.SearchClass(context.Background(), crn)
 	if err != nil {
 		return p.client.SendMessage(chatID, fmt.Sprintf("Error checking class availability: %v", err))
 	}
