@@ -84,5 +84,13 @@ RUN ls -la /usr/bin/chromium* || echo "Chrome binary listing failed"
 
 USER appuser
 
+# Create startup script to set up virtual display
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'export DISPLAY=:99' >> /start.sh && \
+    echo 'Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &' >> /start.sh && \
+    echo 'sleep 2' >> /start.sh && \
+    echo 'exec "$@"' >> /start.sh && \
+    chmod +x /start.sh
+
 # What the container should run when it is started
-ENTRYPOINT [ "dumb-init", "--", "/bin/server" ]
+ENTRYPOINT [ "/start.sh", "dumb-init", "--", "/bin/server" ]

@@ -29,62 +29,34 @@ func New(logger *logger.Logger) Parser {
 
 // SearchClass searches for a class by CRN
 func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
-	// Railway-specific Chrome configuration with complete crashpad disabling
+	// Simplified Chrome configuration for Railway
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("disable-setuid-sandbox", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.Flag("disable-accelerated-2d-canvas", true),
-		chromedp.Flag("no-first-run", true),
-		chromedp.Flag("no-zygote", true),
-		chromedp.Flag("single-process", true),
 		chromedp.Flag("disable-gpu", true),
-		chromedp.Flag("disable-background-timer-throttling", true),
-		chromedp.Flag("disable-backgrounding-occluded-windows", true),
-		chromedp.Flag("disable-renderer-backgrounding", true),
-		chromedp.Flag("disable-features", "TranslateUI,VizDisplayCompositor"),
-		chromedp.Flag("disable-ipc-flooding-protection", true),
-		chromedp.Flag("disable-extensions", true),
-		chromedp.Flag("disable-plugins", true),
-		chromedp.Flag("disable-images", true),
-		chromedp.Flag("disable-javascript", false), // Keep JS enabled for the website
 		chromedp.Flag("disable-web-security", true),
+		chromedp.Flag("disable-features", "VizDisplayCompositor"),
 		chromedp.Flag("remote-debugging-port", "0"),
 		chromedp.Flag("disable-logging", true),
-		chromedp.Flag("log-level", "3"),
-		chromedp.Flag("silent", true),
 		chromedp.Flag("disable-crash-reporter", true),
-		chromedp.Flag("disable-in-process-stack-traces", true),
 		chromedp.Flag("disable-breakpad", true),
 		chromedp.Flag("disable-crashpad", true),
-		chromedp.Flag("disable-crashpad-handler", true),
-		chromedp.Flag("disable-crashpad-handler-database", true),
-		chromedp.Flag("disable-crashpad-handler-upload", true),
-		chromedp.Flag("disable-crashpad-handler-reporting", true),
-		chromedp.Flag("crashpad-handler", false),
 		chromedp.Flag("no-crash-upload", true),
-		chromedp.Flag("disable-crash-reporter", true),
-		chromedp.Flag("disable-crash-reporter-upload", true),
 		chromedp.Flag("user-data-dir", "/tmp/chrome-user-data"),
 		chromedp.Flag("disable-background-networking", true),
 		chromedp.Flag("disable-default-apps", true),
 		chromedp.Flag("disable-sync", true),
 		chromedp.Flag("disable-translate", true),
 		chromedp.Flag("disable-component-update", true),
-		chromedp.Flag("disable-domain-reliability", true),
-		chromedp.Flag("disable-features", "TranslateUI,VizDisplayCompositor,Crashpad"),
 	)
 
 	// Try direct Chrome path first, fallback to wrapper if needed
 	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium-browser"))
 
-	// Add environment variables to completely disable crashpad
-	opts = append(opts, chromedp.Env("CHROME_DISABLE_CRASH_REPORTER", "1"))
-	opts = append(opts, chromedp.Env("CHROME_DISABLE_CRASHPAD", "1"))
-	opts = append(opts, chromedp.Env("CHROME_NO_CRASH_UPLOAD", "1"))
-	opts = append(opts, chromedp.Env("CHROME_DISABLE_BREAKPAD", "1"))
-	opts = append(opts, chromedp.Env("CHROME_DISABLE_CRASHPAD_HANDLER", "1"))
+	// Add essential environment variables
+	opts = append(opts, chromedp.Env("DISPLAY", ":99"))
 
 	p.logger.Info("Creating Chrome allocator context for CRN: %s", crn)
 	allocCtx, cancel := chromedp.NewExecAllocator(ctx, opts...)
@@ -107,12 +79,16 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 
 	// Test Chrome startup with a simple operation first
 	p.logger.Info("Testing Chrome startup for CRN: %s", crn)
-	testCtx, testCancel := context.WithTimeout(ctx, 10*time.Second)
+	testCtx, testCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer testCancel()
 
-	testErr := chromedp.Run(testCtx, chromedp.Navigate("about:blank"))
+	testErr := chromedp.Run(testCtx,
+		chromedp.Navigate("about:blank"),
+		chromedp.Sleep(2*time.Second),
+	)
 	if testErr != nil {
 		p.logger.Error("Chrome startup test failed for CRN %s: %v", crn, testErr)
+		p.logger.Error("Chrome startup test error type: %T", testErr)
 		return nil, fmt.Errorf("Chrome failed to start: %w", testErr)
 	}
 	p.logger.Info("Chrome startup test successful for CRN: %s", crn)
