@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"NDClasses/clients/database"
 	"NDClasses/clients/logger"
@@ -103,7 +104,9 @@ func (p *MessageProcessor) addTrackedCRN(chatID int64, userID int64, crn string)
 
 	// Check class availability to get the title
 	p.logger.Info("Calling parser.SearchClass for CRN: %s (addTrackedCRN)", crn)
-	class, err := p.parser.SearchClass(context.Background(), crn)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	class, err := p.parser.SearchClass(ctx, crn)
 	if err != nil {
 		p.logger.Error("SearchClass failed in addTrackedCRN for CRN %s: %v", crn, err)
 		p.logger.Error("Error type: %T", err)
@@ -200,8 +203,9 @@ func (p *MessageProcessor) checkClassAvailability(chatID int64, crn string) erro
 	p.logger.Debug("CRN validation passed: %s", crn)
 
 	// Create context with timeout
-	ctx := context.Background()
-	p.logger.Debug("Created context for SearchClass operation")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	p.logger.Debug("Created context with 60s timeout for SearchClass operation")
 
 	// Use the ND parser to check class availability
 	p.logger.Info("Calling parser.SearchClass for CRN: %s", crn)

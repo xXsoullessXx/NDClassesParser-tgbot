@@ -22,7 +22,7 @@ type Parser struct {
 func New(logger *logger.Logger) Parser {
 	return Parser{
 		client:  web.New(),
-		timeout: 30 * time.Second, // Default timeout of 30 seconds
+		timeout: 60 * time.Second, // Default timeout of 60 seconds for Railway
 		logger:  logger,
 	}
 }
@@ -100,9 +100,9 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	ctx = newCtx
 	defer cancel()
 
-	// Adding timeout to context
+	// Adding timeout to context - increased for Railway environment
 	p.logger.Debug("Before WithTimeout, ctx is done: %v", ctx.Err() != nil)
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel = context.WithTimeout(ctx, 60*time.Second) // Increased from 30 to 60 seconds
 	p.logger.Debug("After WithTimeout on ctx, ctx is done: %v", ctx.Err() != nil)
 	defer cancel()
 
@@ -114,6 +114,8 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	var seatsStr string
 
 	p.logger.Debug("Before chromedp.Run, ctx is done: %v", ctx.Err() != nil)
+	p.logger.Info("Starting Chrome automation for CRN: %s", crn)
+
 	err := chromedp.Run(ctx,
 		// Navigate to the term selection page
 		chromedp.Navigate(termURL),
@@ -152,7 +154,19 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 		chromedp.Text(`[data-content="Title"]`, &class.Title, chromedp.ByQuery),
 		chromedp.Text(`[data-content="Status"]`, &seatsStr, chromedp.ByQuery),
 	)
+
 	p.logger.Debug("After chromedp.Run, ctx is done: %v, err: %v", ctx.Err() != nil, err)
+
+	// Check if context was canceled
+	if ctx.Err() == context.Canceled {
+		p.logger.Error("Context was canceled during Chrome automation for CRN: %s", crn)
+		return nil, fmt.Errorf("operation was canceled: %w", ctx.Err())
+	}
+
+	if ctx.Err() == context.DeadlineExceeded {
+		p.logger.Error("Context deadline exceeded during Chrome automation for CRN: %s", crn)
+		return nil, fmt.Errorf("operation timed out: %w", ctx.Err())
+	}
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse class information: %w", err)
