@@ -32,8 +32,6 @@ ARG TARGETARCH
 
 RUN --mount=type=bind,target=. \
     CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server . && \
-
-
 ################################################################################
 # Create a new stage for running the application that contains the minimal
 # runtime dependencies for the application. This often uses a different base
