@@ -173,18 +173,55 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	}
 	p.logger.Info("Step 5 completed for CRN: %s", crn)
 
+	// Wait a bit longer for the page to load the keyword input field
+	p.logger.Debug("Waiting for page to load keyword input field for CRN: %s", crn)
+	err = chromedp.Run(ctx, chromedp.Sleep(5*time.Second))
+	if err != nil {
+		p.logger.Error("Wait after Step 5 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to wait after search: %w", err)
+	}
+
 	// Step 6: Wait for keyword input and fill CRN
 	p.logger.Info("Step 6: Filling CRN field for CRN: %s", crn)
-	err = chromedp.Run(ctx,
-		chromedp.WaitVisible(`#txt_keywordlike`, chromedp.ByID),
-		chromedp.SendKeys(`#txt_keywordlike`, crn, chromedp.ByID),
+
+	// Create a shorter timeout for this step
+	step6Ctx, step6Cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer step6Cancel()
+
+	// Try to wait for the element with a timeout
+	p.logger.Debug("Waiting for keyword input field to be visible for CRN: %s", crn)
+	err = chromedp.Run(step6Ctx, chromedp.WaitVisible(`#txt_keywordlike`, chromedp.ByID))
+	if err != nil {
+		p.logger.Error("Keyword input field not visible for CRN %s: %v", crn, err)
+		// Try alternative selector
+		p.logger.Info("Trying alternative selector for CRN: %s", crn)
+		err = chromedp.Run(step6Ctx, chromedp.WaitVisible(`input[name="keywordlike"]`, chromedp.ByQuery))
+		if err != nil {
+			p.logger.Error("Alternative selector also failed for CRN %s: %v", crn, err)
+			return nil, fmt.Errorf("keyword input field not found: %w", err)
+		}
+		p.logger.Info("Alternative selector worked for CRN: %s", crn)
+	}
+
+	// Fill CRN field
+	p.logger.Debug("Filling CRN field for CRN: %s", crn)
+	err = chromedp.Run(step6Ctx, chromedp.SendKeys(`#txt_keywordlike`, crn, chromedp.ByID))
+	if err != nil {
+		p.logger.Error("Failed to fill CRN field for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to fill CRN field: %w", err)
+	}
+
+	// Click search button
+	p.logger.Debug("Clicking search button for CRN: %s", crn)
+	err = chromedp.Run(step6Ctx,
 		chromedp.Sleep(1*time.Second),
 		chromedp.Click(`#search-go`, chromedp.ByID),
 	)
 	if err != nil {
-		p.logger.Error("Step 6 failed for CRN %s: %v", crn, err)
-		return nil, fmt.Errorf("failed to fill CRN and search: %w", err)
+		p.logger.Error("Failed to click search button for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to click search button: %w", err)
 	}
+
 	p.logger.Info("Step 6 completed for CRN: %s", crn)
 
 	// Step 7: Wait for results and extract data
