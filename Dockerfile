@@ -17,8 +17,6 @@ COPY . .
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server .
 
-# Copy the .env file
-COPY .env /tmp/.env
 
 # Final stage
 FROM alpine:latest AS final
@@ -48,8 +46,6 @@ WORKDIR /app
 # Copy the executable from the "build" stage
 COPY --from=build /bin/server /bin/
 
-# Copy .env file
-COPY --from=build /tmp/.env .env
 
 USER appuser
 
