@@ -52,8 +52,7 @@ FROM alpine:latest AS final
 
 # Install any runtime dependencies that are needed to run your application.
 # Leverage a cache mount to /var/cache/apk/ to speed up subsequent builds.
-RUN --mount=type=cache,id=s/${RAILWAY_SERVICE_ID}-apk-cache,target=/var/cache/apk \
-    apk --update add \
+RUN apk --update add \
         ca-certificates \
         tzdata \
         chromium \
