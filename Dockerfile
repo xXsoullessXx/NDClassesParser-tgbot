@@ -2,6 +2,10 @@
 # If you need more help, visit the Dockerfile reference guide at
 # https://docs.docker.com/go/dockerfile-reference/
 
+# Comments are provided throughout this file to help you get started.
+# If you need more help, visit the Dockerfile reference guide at
+# https://docs.docker.com/go/dockerfile-reference/
+
 # Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
 
 ################################################################################
@@ -71,12 +75,14 @@ RUN adduser \
 WORKDIR /app
 
 # Copy the executable from the "build" stage.
+# Copy the executable from the "build" stage.
 COPY --from=build /bin/server /bin/
 
 
 
 USER appuser
 
+# What the container should run when it is started.
 # What the container should run when it is started.
 ENTRYPOINT [ "/bin/server" ]
 
