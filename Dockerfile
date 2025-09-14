@@ -42,13 +42,8 @@ RUN apk update && apk add --no-cache \
 RUN mkdir -p /tmp/chrome-user-data /tmp/.X11-unix /tmp/.chromium && \
     chmod 777 /tmp/chrome-user-data /tmp/.X11-unix /tmp/.chromium
 
-# Create startup script to set up virtual display
-RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'export DISPLAY=:99' >> /app/start.sh && \
-    echo 'Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &' >> /app/start.sh && \
-    echo 'sleep 2' >> /app/start.sh && \
-    echo 'exec "$@"' >> /app/start.sh && \
-    chmod +x /app/start.sh
+# Create app directory
+RUN mkdir -p /app
 
 # Set environment variables for Chrome
 ENV DISPLAY=:99
@@ -84,6 +79,10 @@ COPY --from=build /bin/server /bin/
 # Copy Chrome wrapper script
 COPY chrome-wrapper.sh /usr/local/bin/chrome-wrapper
 RUN chmod +x /usr/local/bin/chrome-wrapper
+
+# Copy startup script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # Test Chrome installation
 RUN /usr/bin/chromium-browser --version || echo "Chrome version check failed"
