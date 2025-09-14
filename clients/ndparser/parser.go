@@ -39,11 +39,7 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 		chromedp.Flag("ignore-certificate-errors", true),                                   // Игнорировать ошибки сертификатов
 		chromedp.Flag("window-size", "1200,800"),                                           // Размер окна
 		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"), // Кастомный User-Agent
-		chromedp.Flag("disable-crash-reporter", true),                                      // Disable crash reporting to avoid database requirement
-		chromedp.Flag("crash-dumps-dir", "/tmp"),                                           // Set crash dumps directory
 	)
-
-	p.logger.Debug("Launching Chrome with headless=%v", headless)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancel()
