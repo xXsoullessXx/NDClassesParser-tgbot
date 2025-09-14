@@ -234,15 +234,57 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 
 	// Step 7: Wait for results and extract data
 	p.logger.Info("Step 7: Extracting class data for CRN: %s", crn)
-	err = chromedp.Run(ctx,
-		chromedp.Sleep(2*time.Second),
-		chromedp.Text(`[data-content="Title"]`, &class.Title, chromedp.ByQuery),
-		chromedp.Text(`[data-content="Status"]`, &seatsStr, chromedp.ByQuery),
-	)
+	p.logger.Debug("Context status before Step 7: %v", ctx.Err())
+
+	// Create a shorter timeout for this step
+	step7Ctx, step7Cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer step7Cancel()
+
+	// Wait for results with shorter timeout
+	p.logger.Debug("Waiting for results to load for CRN: %s", crn)
+	err = chromedp.Run(step7Ctx, chromedp.Sleep(1*time.Second)) // Reduced from 2 to 1 second
 	if err != nil {
-		p.logger.Error("Step 7 failed for CRN %s: %v", crn, err)
-		return nil, fmt.Errorf("failed to extract class data: %w", err)
+		p.logger.Error("Wait for results failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to wait for results: %w", err)
 	}
+
+	// Debug: Get page title to see if we're on the right page
+	var pageTitle string
+	chromedp.Run(step7Ctx, chromedp.Title(&pageTitle))
+	p.logger.Debug("Page title for CRN %s: %s", crn, pageTitle)
+
+	// Try to extract title with fallback selectors
+	p.logger.Debug("Extracting class title for CRN: %s", crn)
+	err = chromedp.Run(step7Ctx, chromedp.Text(`[data-content="Title"]`, &class.Title, chromedp.ByQuery))
+	if err != nil {
+		p.logger.Error("Primary title selector failed for CRN %s: %v", crn, err)
+		// Try alternative selectors
+		p.logger.Info("Trying alternative title selectors for CRN: %s", crn)
+		err = chromedp.Run(step7Ctx, chromedp.Text(`.title`, &class.Title, chromedp.ByQuery))
+		if err != nil {
+			p.logger.Error("Alternative title selector failed for CRN %s: %v", crn, err)
+			// Set default title
+			class.Title = "Unknown Class"
+			p.logger.Info("Using default title for CRN: %s", crn)
+		}
+	}
+
+	// Try to extract seats with fallback selectors
+	p.logger.Debug("Extracting seats data for CRN: %s", crn)
+	err = chromedp.Run(step7Ctx, chromedp.Text(`[data-content="Status"]`, &seatsStr, chromedp.ByQuery))
+	if err != nil {
+		p.logger.Error("Primary seats selector failed for CRN %s: %v", crn, err)
+		// Try alternative selectors
+		p.logger.Info("Trying alternative seats selectors for CRN: %s", crn)
+		err = chromedp.Run(step7Ctx, chromedp.Text(`.seats`, &seatsStr, chromedp.ByQuery))
+		if err != nil {
+			p.logger.Error("Alternative seats selector failed for CRN %s: %v", crn, err)
+			// Set default seats
+			seatsStr = "0"
+			p.logger.Info("Using default seats for CRN: %s", crn)
+		}
+	}
+
 	p.logger.Info("Step 7 completed for CRN: %s", crn)
 
 	p.logger.Debug("All Chrome automation steps completed for CRN: %s", crn)
