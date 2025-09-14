@@ -31,10 +31,20 @@ RUN apk add --no-cache \
     freetype \
     harfbuzz \
     ca-certificates \
-    ttf-freefont
+    ttf-freefont \
+    xvfb \
+    dbus \
+    ttf-dejavu-core \
+    fontconfig
 
-# Create directories for Chrome
-RUN mkdir -p /tmp/chrome-user-data
+# Create directories for Chrome and set permissions
+RUN mkdir -p /tmp/chrome-user-data /tmp/.X11-unix && \
+    chmod 777 /tmp/chrome-user-data /tmp/.X11-unix
+
+# Set environment variables for Chrome
+ENV DISPLAY=:99
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV CHROME_PATH=/usr/bin/chromium-browser
 
 # Create a non-privileged user
 ARG UID=10001

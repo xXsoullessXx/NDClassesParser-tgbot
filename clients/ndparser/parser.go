@@ -29,24 +29,53 @@ func New(logger *logger.Logger) Parser {
 
 // SearchClass searches for a class by CRN
 func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
-	//headless := !p.logger.IsDebugMode() // Headless in normal mode, visible in debug mode
+	// Railway-specific Chrome configuration
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
-		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-setuid-sandbox", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.Flag("disable-software-rasterizer", true),
-		chromedp.Flag("disable-crash-reporter", true),
-		chromedp.Flag("no-crash-upload", true),
-		chromedp.Flag("disable-logging", true),
-		chromedp.Flag("user-data-dir", "/tmp/chrome-user-data"),
+		chromedp.Flag("disable-accelerated-2d-canvas", true),
+		chromedp.Flag("no-first-run", true),
+		chromedp.Flag("no-zygote", true),
+		chromedp.Flag("single-process", true),
+		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("disable-background-timer-throttling", true),
 		chromedp.Flag("disable-backgrounding-occluded-windows", true),
 		chromedp.Flag("disable-renderer-backgrounding", true),
 		chromedp.Flag("disable-features", "TranslateUI"),
 		chromedp.Flag("disable-ipc-flooding-protection", true),
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-plugins", true),
+		chromedp.Flag("disable-images", true),
+		chromedp.Flag("disable-javascript", false), // Keep JS enabled for the website
+		chromedp.Flag("disable-web-security", true),
+		chromedp.Flag("disable-features", "VizDisplayCompositor"),
+		chromedp.Flag("remote-debugging-port", "0"),
+		chromedp.Flag("disable-logging", true),
+		chromedp.Flag("log-level", "3"),
+		chromedp.Flag("silent", true),
+		chromedp.Flag("disable-crash-reporter", true),
+		chromedp.Flag("disable-in-process-stack-traces", true),
+		chromedp.Flag("disable-logging", true),
+		chromedp.Flag("disable-breakpad", true),
+		chromedp.Flag("disable-crashpad", true),
+		chromedp.Flag("user-data-dir", "/tmp/chrome-user-data"),
 	)
-	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium-browser"))
+
+	// Try different Chrome executable paths for Railway
+	chromePaths := []string{
+		"/usr/bin/chromium-browser",
+		"/usr/bin/chromium",
+		"/usr/bin/google-chrome",
+		"/usr/bin/google-chrome-stable",
+		"/usr/bin/chrome",
+	}
+
+	for _, path := range chromePaths {
+		opts = append(opts, chromedp.ExecPath(path))
+		break // Use first available path
+	}
 
 	allocCtx, cancel := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancel()
