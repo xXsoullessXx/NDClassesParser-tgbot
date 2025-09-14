@@ -9,8 +9,6 @@ import (
 	"NDClasses/clients/database"
 	"NDClasses/clients/logger"
 	"NDClasses/clients/telegram"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -25,12 +23,6 @@ func main() {
 	logger.Info("Starting ND Classes Parser Bot")
 	if *debugMode {
 		logger.Info("Debug mode enabled")
-	}
-
-	// Load environment variables from .env file
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
 	}
 
 	// Get bot token from environment variables
