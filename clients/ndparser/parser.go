@@ -95,7 +95,7 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 
 	// Adding timeout to context - increased for Railway environment
 	p.logger.Debug("Before WithTimeout, ctx is done: %v", ctx.Err() != nil)
-	ctx, cancel = context.WithTimeout(ctx, 60*time.Second) // Increased from 30 to 60 seconds
+	ctx, cancel = context.WithTimeout(ctx, 120*time.Second) // Increased to 120 seconds for Railway
 	p.logger.Debug("After WithTimeout on ctx, ctx is done: %v", ctx.Err() != nil)
 	defer cancel()
 
@@ -109,12 +109,14 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	p.logger.Debug("Before chromedp.Run, ctx is done: %v", ctx.Err() != nil)
 	p.logger.Info("Starting Chrome automation for CRN: %s", crn)
 
+	p.logger.Debug("Starting Chrome automation steps for CRN: %s", crn)
+
 	err := chromedp.Run(ctx,
 		// Navigate to the term selection page
 		chromedp.Navigate(termURL),
 
-		// Wait for page to load
-		chromedp.Sleep(14*time.Second),
+		// Wait for page to load - reduced from 14 to 10 seconds
+		chromedp.Sleep(10*time.Second),
 
 		// Click on the term selection input
 		chromedp.Click(`#s2id_txt_term`, chromedp.ByID),
@@ -140,13 +142,15 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 		chromedp.Sleep(1*time.Second),
 		chromedp.Click(`#search-go`, chromedp.ByID),
 
-		// Wait for results to load
-		chromedp.Sleep(3*time.Second),
+		// Wait for results to load - reduced from 3 to 2 seconds
+		chromedp.Sleep(2*time.Second),
 
 		// Extract class information
 		chromedp.Text(`[data-content="Title"]`, &class.Title, chromedp.ByQuery),
 		chromedp.Text(`[data-content="Status"]`, &seatsStr, chromedp.ByQuery),
 	)
+
+	p.logger.Debug("Chrome automation steps completed for CRN: %s", crn)
 
 	p.logger.Debug("After chromedp.Run, ctx is done: %v, err: %v", ctx.Err() != nil, err)
 
