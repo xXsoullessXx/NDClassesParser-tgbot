@@ -234,22 +234,22 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 
 	// Step 7: Wait for results and extract data
 	p.logger.Info("Step 7: Extracting class data for CRN: %s", crn)
-	p.logger.Debug("Context status before Step 7: %v", ctx.Err())
+	p.logger.Info("Context status before Step 7: %v", ctx.Err())
 
 	// Create a very short timeout for this step
 	step7Ctx, step7Cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer step7Cancel()
 
 	// Skip the sleep and go directly to extraction
-	p.logger.Debug("Attempting immediate data extraction for CRN: %s", crn)
+	p.logger.Info("Attempting immediate data extraction for CRN: %s", crn)
 
 	// Debug: Get page title to see if we're on the right page
 	var pageTitle string
 	chromedp.Run(step7Ctx, chromedp.Title(&pageTitle))
-	p.logger.Debug("Page title for CRN %s: %s", crn, pageTitle)
+	p.logger.Info("Page title for CRN %s: %s", crn, pageTitle)
 
 	// Try to extract title with fallback selectors
-	p.logger.Debug("Extracting class title for CRN: %s", crn)
+	p.logger.Info("Extracting class title for CRN: %s", crn)
 	titleCtx, titleCancel := context.WithTimeout(step7Ctx, 5*time.Second)
 	defer titleCancel()
 
