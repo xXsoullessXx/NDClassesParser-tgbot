@@ -31,8 +31,11 @@ func New(logger *logger.Logger) Parser {
 func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	headless := !p.logger.IsDebugMode() // Headless in normal mode, visible in debug mode
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", headless),                                                // Show browser in debug mode
-		chromedp.Flag("disable-gpu", false),                                                // Включить GPU (если нужно)
+		chromedp.Flag("headless", "new"),
+		chromedp.Flag("no-sandbox", true), // Show browser in debug mode
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("remote-debugging-port", "0"),
+		chromedp.Flag("disable-dev-shm-usage", true),                                       // Включить GPU (если нужно)
 		chromedp.Flag("ignore-certificate-errors", true),                                   // Игнорировать ошибки сертификатов
 		chromedp.Flag("window-size", "1200,800"),                                           // Размер окна
 		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"), // Кастомный User-Agent
