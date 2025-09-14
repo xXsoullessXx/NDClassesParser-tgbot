@@ -42,6 +42,14 @@ RUN apk update && apk add --no-cache \
 RUN mkdir -p /tmp/chrome-user-data /tmp/.X11-unix /tmp/.chromium && \
     chmod 777 /tmp/chrome-user-data /tmp/.X11-unix /tmp/.chromium
 
+# Create startup script to set up virtual display
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'export DISPLAY=:99' >> /app/start.sh && \
+    echo 'Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &' >> /app/start.sh && \
+    echo 'sleep 2' >> /app/start.sh && \
+    echo 'exec "$@"' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
 # Set environment variables for Chrome
 ENV DISPLAY=:99
 ENV CHROME_BIN=/usr/bin/chromium-browser
@@ -84,13 +92,5 @@ RUN ls -la /usr/bin/chromium* || echo "Chrome binary listing failed"
 
 USER appuser
 
-# Create startup script to set up virtual display
-RUN echo '#!/bin/sh' > /start.sh && \
-    echo 'export DISPLAY=:99' >> /start.sh && \
-    echo 'Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &' >> /start.sh && \
-    echo 'sleep 2' >> /start.sh && \
-    echo 'exec "$@"' >> /start.sh && \
-    chmod +x /start.sh
-
 # What the container should run when it is started
-ENTRYPOINT [ "/start.sh", "dumb-init", "--", "/bin/server" ]
+ENTRYPOINT [ "/app/start.sh", "dumb-init", "--", "/bin/server" ]
