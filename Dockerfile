@@ -77,6 +77,10 @@ COPY --from=build /bin/server /bin/
 COPY chrome-wrapper.sh /usr/local/bin/chrome-wrapper
 RUN chmod +x /usr/local/bin/chrome-wrapper
 
+# Test Chrome installation
+RUN /usr/bin/chromium-browser --version || echo "Chrome version check failed"
+RUN ls -la /usr/bin/chromium* || echo "Chrome binary listing failed"
+
 
 USER appuser
 

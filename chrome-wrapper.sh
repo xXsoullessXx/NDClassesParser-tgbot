@@ -11,9 +11,23 @@ export CHROME_DISABLE_CRASHPAD=1
 export CHROME_NO_CRASH_UPLOAD=1
 export CHROME_DISABLE_BREAKPAD=1
 export CHROME_DISABLE_CRASHPAD_HANDLER=1
+export DISPLAY=:99
 
 # Create directories if they don't exist
 mkdir -p /tmp/.chromium /tmp/chrome-user-data
+
+# Log startup
+echo "Starting Chrome wrapper script..."
+echo "Environment variables set"
+echo "Directories created"
+
+# Check if Chrome binary exists
+if [ ! -f "/usr/bin/chromium-browser" ]; then
+    echo "ERROR: Chrome binary not found at /usr/bin/chromium-browser"
+    exit 1
+fi
+
+echo "Chrome binary found, launching..."
 
 # Launch Chrome with all crashpad disabling flags
 exec /usr/bin/chromium-browser \

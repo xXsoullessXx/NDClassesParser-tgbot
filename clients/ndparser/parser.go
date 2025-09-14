@@ -76,8 +76,8 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 		chromedp.Flag("disable-features", "TranslateUI,VizDisplayCompositor,Crashpad"),
 	)
 
-	// Set Chrome executable path to use wrapper script
-	opts = append(opts, chromedp.ExecPath("/usr/local/bin/chrome-wrapper"))
+	// Try direct Chrome path first, fallback to wrapper if needed
+	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium-browser"))
 
 	// Add environment variables to completely disable crashpad
 	opts = append(opts, chromedp.Env("CHROME_DISABLE_CRASH_REPORTER", "1"))
@@ -86,8 +86,11 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	opts = append(opts, chromedp.Env("CHROME_DISABLE_BREAKPAD", "1"))
 	opts = append(opts, chromedp.Env("CHROME_DISABLE_CRASHPAD_HANDLER", "1"))
 
+	p.logger.Info("Creating Chrome allocator context for CRN: %s", crn)
 	allocCtx, cancel := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancel()
+
+	p.logger.Info("Creating Chrome context for CRN: %s", crn)
 	// Create a new chromedp context
 	var newCtx context.Context
 	if p.logger.IsDebugMode() {
@@ -99,6 +102,20 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	}
 	ctx = newCtx
 	defer cancel()
+
+	p.logger.Info("Chrome context created successfully for CRN: %s", crn)
+
+	// Test Chrome startup with a simple operation first
+	p.logger.Info("Testing Chrome startup for CRN: %s", crn)
+	testCtx, testCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer testCancel()
+
+	testErr := chromedp.Run(testCtx, chromedp.Navigate("about:blank"))
+	if testErr != nil {
+		p.logger.Error("Chrome startup test failed for CRN %s: %v", crn, testErr)
+		return nil, fmt.Errorf("Chrome failed to start: %w", testErr)
+	}
+	p.logger.Info("Chrome startup test successful for CRN: %s", crn)
 
 	// Adding timeout to context - increased for Railway environment
 	p.logger.Debug("Before WithTimeout, ctx is done: %v", ctx.Err() != nil)
