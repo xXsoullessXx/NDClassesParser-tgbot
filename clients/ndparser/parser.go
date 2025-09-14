@@ -39,6 +39,8 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 		chromedp.Flag("disable-crash-reporter", true),
 		chromedp.Flag("no-crash-upload", true),
 		chromedp.Flag("disable-logging", true),
+		chromedp.Flag("user-data-dir", "/tmp/chrome-user-data"),
+		chromedp.Flag("crash-dumps-dir", "/tmp/chrome-crashpad"),
 	)
 	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium-browser"))
 

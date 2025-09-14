@@ -33,6 +33,9 @@ RUN apk add --no-cache \
     ca-certificates \
     ttf-freefont
 
+# Create directories for Chrome
+RUN mkdir -p /tmp/chrome-user-data /tmp/chrome-crashpad
+
 # Create a non-privileged user
 ARG UID=10001
 RUN adduser \
