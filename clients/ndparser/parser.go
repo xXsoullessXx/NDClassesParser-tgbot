@@ -40,7 +40,11 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 		chromedp.Flag("no-crash-upload", true),
 		chromedp.Flag("disable-logging", true),
 		chromedp.Flag("user-data-dir", "/tmp/chrome-user-data"),
-		chromedp.Flag("crash-dumps-dir", "/tmp/chrome-crashpad"),
+		chromedp.Flag("disable-background-timer-throttling", true),
+		chromedp.Flag("disable-backgrounding-occluded-windows", true),
+		chromedp.Flag("disable-renderer-backgrounding", true),
+		chromedp.Flag("disable-features", "TranslateUI"),
+		chromedp.Flag("disable-ipc-flooding-protection", true),
 	)
 	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium-browser"))
 
