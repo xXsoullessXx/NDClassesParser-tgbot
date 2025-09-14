@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/chromedp/chromedp v0.14.1
-	github.com/joho/godotenv v1.4.0
 	gorm.io/driver/postgres v1.5.10
 	gorm.io/gorm v1.25.10
 )

@@ -21,6 +21,9 @@ RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server .
 # Final stage
 FROM alpine:latest AS final
 
+#Install chromium
+RUN apt-get update && apt-get install -y chromium chromium-driver
+
 # Install runtime dependencies
 RUN apk --update add \
     ca-certificates \
