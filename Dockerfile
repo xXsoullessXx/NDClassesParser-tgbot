@@ -39,8 +39,8 @@ RUN apk update && apk add --no-cache \
     dumb-init
 
 # Create directories for Chrome and set permissions
-RUN mkdir -p /tmp/chrome-user-data /tmp/.X11-unix && \
-    chmod 777 /tmp/chrome-user-data /tmp/.X11-unix
+RUN mkdir -p /tmp/chrome-user-data /tmp/.X11-unix /tmp/.chromium && \
+    chmod 777 /tmp/chrome-user-data /tmp/.X11-unix /tmp/.chromium
 
 # Set environment variables for Chrome
 ENV DISPLAY=:99
@@ -51,6 +51,10 @@ ENV CHROME_DISABLE_CRASHPAD=1
 ENV CHROME_NO_CRASH_UPLOAD=1
 ENV CHROME_DISABLE_BREAKPAD=1
 ENV CHROME_DISABLE_CRASHPAD_HANDLER=1
+ENV XDG_CONFIG_HOME=/tmp/.chromium
+ENV XDG_CACHE_HOME=/tmp/.chromium
+ENV XDG_DATA_HOME=/tmp/.chromium
+ENV HOME=/tmp
 
 # Create a non-privileged user
 ARG UID=10001
@@ -68,6 +72,10 @@ WORKDIR /app
 
 # Copy the executable from the "build" stage
 COPY --from=build /bin/server /bin/
+
+# Copy Chrome wrapper script
+COPY chrome-wrapper.sh /usr/local/bin/chrome-wrapper
+RUN chmod +x /usr/local/bin/chrome-wrapper
 
 
 USER appuser

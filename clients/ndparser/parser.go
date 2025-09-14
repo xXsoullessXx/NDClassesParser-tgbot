@@ -76,8 +76,8 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 		chromedp.Flag("disable-features", "TranslateUI,VizDisplayCompositor,Crashpad"),
 	)
 
-	// Set Chrome executable path
-	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium-browser"))
+	// Set Chrome executable path to use wrapper script
+	opts = append(opts, chromedp.ExecPath("/usr/local/bin/chrome-wrapper"))
 
 	// Add environment variables to completely disable crashpad
 	opts = append(opts, chromedp.Env("CHROME_DISABLE_CRASH_REPORTER", "1"))
