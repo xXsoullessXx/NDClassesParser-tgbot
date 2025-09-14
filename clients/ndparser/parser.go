@@ -40,7 +40,7 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 		chromedp.Flag("no-crash-upload", true),
 		chromedp.Flag("disable-logging", true),
 	)
-	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium"))
+	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium-browser"))
 
 	allocCtx, cancel := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancel()
