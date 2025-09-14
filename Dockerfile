@@ -34,7 +34,6 @@ ARG TARGETARCH
 
 RUN --mount=type=bind,target=. \
     CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server . && \
-
     cp .env /tmp/.env
 
 
