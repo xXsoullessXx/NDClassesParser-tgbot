@@ -93,6 +93,18 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	}
 	p.logger.Info("Chrome startup test successful for CRN: %s", crn)
 
+	// Test navigation to a simple page first
+	p.logger.Info("Testing navigation to Google for CRN: %s", crn)
+	navCtx, navCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer navCancel()
+
+	navErr := chromedp.Run(navCtx, chromedp.Navigate("https://www.google.com"))
+	if navErr != nil {
+		p.logger.Error("Navigation test failed for CRN %s: %v", crn, navErr)
+		return nil, fmt.Errorf("Chrome navigation test failed: %w", navErr)
+	}
+	p.logger.Info("Navigation test successful for CRN: %s", crn)
+
 	// Adding timeout to context - increased for Railway environment
 	p.logger.Debug("Before WithTimeout, ctx is done: %v", ctx.Err() != nil)
 	ctx, cancel = context.WithTimeout(ctx, 120*time.Second) // Increased to 120 seconds for Railway
@@ -111,48 +123,84 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 
 	p.logger.Debug("Starting Chrome automation steps for CRN: %s", crn)
 
-	err := chromedp.Run(ctx,
-		// Navigate to the term selection page
-		chromedp.Navigate(termURL),
+	// Step 1: Navigate to the page
+	p.logger.Info("Step 1: Navigating to term selection page for CRN: %s", crn)
+	err := chromedp.Run(ctx, chromedp.Navigate(termURL))
+	if err != nil {
+		p.logger.Error("Step 1 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to navigate to page: %w", err)
+	}
+	p.logger.Info("Step 1 completed for CRN: %s", crn)
 
-		// Wait for page to load - reduced from 14 to 10 seconds
-		chromedp.Sleep(10*time.Second),
+	// Step 2: Wait for page load
+	p.logger.Info("Step 2: Waiting for page load for CRN: %s", crn)
+	err = chromedp.Run(ctx, chromedp.Sleep(10*time.Second))
+	if err != nil {
+		p.logger.Error("Step 2 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to wait for page load: %w", err)
+	}
+	p.logger.Info("Step 2 completed for CRN: %s", crn)
 
-		// Click on the term selection input
-		chromedp.Click(`#s2id_txt_term`, chromedp.ByID),
+	// Step 3: Click term selection
+	p.logger.Info("Step 3: Clicking term selection for CRN: %s", crn)
+	err = chromedp.Run(ctx, chromedp.Click(`#s2id_txt_term`, chromedp.ByID))
+	if err != nil {
+		p.logger.Error("Step 3 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to click term selection: %w", err)
+	}
+	p.logger.Info("Step 3 completed for CRN: %s", crn)
 
-		// Wait for the term selection input to be ready
+	// Step 4: Wait and fill term
+	p.logger.Info("Step 4: Filling term selection for CRN: %s", crn)
+	err = chromedp.Run(ctx,
 		chromedp.Sleep(2*time.Second),
-
-		// Fill in "Fall Semester 2025" in the term selection field
 		chromedp.SendKeys(`#s2id_autogen1_search`, "Fall Semester 2025", chromedp.ByID),
 		chromedp.Sleep(1*time.Second),
 		chromedp.SendKeys(`#s2id_autogen1_search`, "\n", chromedp.ByID),
+	)
+	if err != nil {
+		p.logger.Error("Step 4 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to fill term selection: %w", err)
+	}
+	p.logger.Info("Step 4 completed for CRN: %s", crn)
 
-		// Click the search button
-		chromedp.Click(`#term-go`, chromedp.ByID),
+	// Step 5: Click search button
+	p.logger.Info("Step 5: Clicking search button for CRN: %s", crn)
+	err = chromedp.Run(ctx, chromedp.Click(`#term-go`, chromedp.ByID))
+	if err != nil {
+		p.logger.Error("Step 5 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to click search button: %w", err)
+	}
+	p.logger.Info("Step 5 completed for CRN: %s", crn)
 
-		// Wait for the keyword input to be ready
+	// Step 6: Wait for keyword input and fill CRN
+	p.logger.Info("Step 6: Filling CRN field for CRN: %s", crn)
+	err = chromedp.Run(ctx,
 		chromedp.WaitVisible(`#txt_keywordlike`, chromedp.ByID),
-
-		// Fill in the CRN in the keyword field
 		chromedp.SendKeys(`#txt_keywordlike`, crn, chromedp.ByID),
-
-		// Wait a bit and click the search button again
 		chromedp.Sleep(1*time.Second),
 		chromedp.Click(`#search-go`, chromedp.ByID),
+	)
+	if err != nil {
+		p.logger.Error("Step 6 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to fill CRN and search: %w", err)
+	}
+	p.logger.Info("Step 6 completed for CRN: %s", crn)
 
-		// Wait for results to load - reduced from 3 to 2 seconds
+	// Step 7: Wait for results and extract data
+	p.logger.Info("Step 7: Extracting class data for CRN: %s", crn)
+	err = chromedp.Run(ctx,
 		chromedp.Sleep(2*time.Second),
-
-		// Extract class information
 		chromedp.Text(`[data-content="Title"]`, &class.Title, chromedp.ByQuery),
 		chromedp.Text(`[data-content="Status"]`, &seatsStr, chromedp.ByQuery),
 	)
+	if err != nil {
+		p.logger.Error("Step 7 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to extract class data: %w", err)
+	}
+	p.logger.Info("Step 7 completed for CRN: %s", crn)
 
-	p.logger.Debug("Chrome automation steps completed for CRN: %s", crn)
-
-	p.logger.Debug("After chromedp.Run, ctx is done: %v, err: %v", ctx.Err() != nil, err)
+	p.logger.Debug("All Chrome automation steps completed for CRN: %s", crn)
 
 	// Check if context was canceled
 	if ctx.Err() == context.Canceled {
@@ -163,10 +211,6 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	if ctx.Err() == context.DeadlineExceeded {
 		p.logger.Error("Context deadline exceeded during Chrome automation for CRN: %s", crn)
 		return nil, fmt.Errorf("operation timed out: %w", ctx.Err())
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse class information: %w", err)
 	}
 
 	// Convert string values to integers
