@@ -23,8 +23,8 @@ FROM alpine:latest AS final
 
 
 
-# Install runtime dependencies
-RUN apk add --no-cache \
+# Update package repositories and install runtime dependencies
+RUN apk update && apk add --no-cache \
     chromium \
     chromium-chromedriver \
     nss \
@@ -34,8 +34,9 @@ RUN apk add --no-cache \
     ttf-freefont \
     xvfb \
     dbus \
-    ttf-dejavu-core \
-    fontconfig
+    ttf-dejavu \
+    fontconfig \
+    dumb-init
 
 # Create directories for Chrome and set permissions
 RUN mkdir -p /tmp/chrome-user-data /tmp/.X11-unix && \
@@ -67,4 +68,4 @@ COPY --from=build /bin/server /bin/
 USER appuser
 
 # What the container should run when it is started
-ENTRYPOINT [ "/bin/server" ]
+ENTRYPOINT [ "dumb-init", "--", "/bin/server" ]
