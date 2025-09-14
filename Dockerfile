@@ -19,8 +19,8 @@ WORKDIR /src
 # the container.
 
 RUN --mount=type=bind,source=go.sum,target=go.sum \
-    --mount=type=bind,source=go.mod,target=go.mod \
-    go mod download -x
+    --mount=type=bind,source=go.mod,target=go.mod \
+    go mod download -x
 
 
 # This is the architecture you're building for, which is passed in by the builder.
@@ -33,8 +33,8 @@ ARG TARGETARCH
 # source code into the container.
 
 RUN --mount=type=bind,target=. \
-    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server . && \
-    cp .env /tmp/.env
+    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server . && \
+    cp .env /tmp/.env
 
 
 ################################################################################
