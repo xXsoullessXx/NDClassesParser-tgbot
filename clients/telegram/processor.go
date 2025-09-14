@@ -99,7 +99,7 @@ func (p *MessageProcessor) addTrackedCRN(chatID int64, userID int64, crn string)
 		p.logger.Error("Empty CRN provided for addTrackedCRN")
 		return p.client.SendMessage(chatID, "Error: CRN cannot be empty")
 	}
-
+	err := p.client.SendMessage(chatID, "Checking class and adding to list...")
 	p.logger.Debug("CRN validation passed: %s", crn)
 
 	// Check class availability to get the title
@@ -132,13 +132,13 @@ func (p *MessageProcessor) addTrackedCRN(chatID int64, userID int64, crn string)
 
 	// Add CRN to database
 	p.logger.Info("Adding CRN %s to database for UserID: %d", crn, userID)
-	trackedCRN, err := p.db.AddTrackedCRN(userID, crn, class.Title)
+	trackedCRN, isNew, err := p.db.AddTrackedCRN(userID, crn, class.Title)
 	if err != nil {
 		p.logger.Error("Failed to add CRN %s to database for UserID %d: %v", crn, userID, err)
 		return p.client.SendMessage(chatID, fmt.Sprintf("Error adding CRN to tracking list: %v", err))
 	}
 
-	p.logger.Info("Successfully added CRN %s to database", crn)
+	p.logger.Info("Successfully processed CRN %s in database (new: %v)", crn, isNew)
 
 	// Update the title in case it changed
 	if trackedCRN.Title != class.Title {
@@ -146,8 +146,14 @@ func (p *MessageProcessor) addTrackedCRN(chatID int64, userID int64, crn string)
 		p.db.UpdateCRNTitle(userID, crn, class.Title)
 	}
 
-	successMsg := fmt.Sprintf("Added CRN %s (%s) to your tracking list.", crn, class.Title)
-	p.logger.Info("Sending success message for CRN %s: %s", crn, successMsg)
+	// Prepare appropriate message based on whether it was newly added or already existed
+	var successMsg string
+	if isNew {
+		successMsg = fmt.Sprintf("Added CRN %s (%s) to your tracking list.", crn, class.Title)
+	} else {
+		successMsg = fmt.Sprintf("CRN %s (%s) is already in your tracking list.", crn, class.Title)
+	}
+	p.logger.Info("Sending message for CRN %s: %s", crn, successMsg)
 
 	return p.client.SendMessage(chatID, successMsg)
 }
@@ -155,12 +161,17 @@ func (p *MessageProcessor) addTrackedCRN(chatID int64, userID int64, crn string)
 // removeTrackedCRN removes a CRN from the user's tracking list
 func (p *MessageProcessor) removeTrackedCRN(chatID int64, userID int64, crn string) error {
 	// Remove CRN from database
-	err := p.db.RemoveTrackedCRN(userID, crn)
+	wasRemoved, err := p.db.RemoveTrackedCRN(userID, crn)
 	if err != nil {
 		return p.client.SendMessage(chatID, fmt.Sprintf("Error removing CRN from tracking list: %v", err))
 	}
 
-	return p.client.SendMessage(chatID, fmt.Sprintf("Removed CRN %s from your tracking list.", crn))
+	// Send appropriate message based on whether the CRN was actually removed
+	if wasRemoved {
+		return p.client.SendMessage(chatID, fmt.Sprintf("Removed CRN %s from your tracking list.", crn))
+	} else {
+		return p.client.SendMessage(chatID, fmt.Sprintf("CRN %s is not in your tracking list.", crn))
+	}
 }
 
 // listTrackedCRNs lists all CRNs tracked by the user
