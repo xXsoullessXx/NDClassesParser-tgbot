@@ -29,13 +29,16 @@ func New(logger *logger.Logger) Parser {
 
 // SearchClass searches for a class by CRN
 func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
-	headless := !p.logger.IsDebugMode() // Headless in normal mode, visible in debug mode
+	//headless := !p.logger.IsDebugMode() // Headless in normal mode, visible in debug mode
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", headless),                                                // Show browser in debug mode
-		chromedp.Flag("disable-gpu", false),                                                // Включить GPU (если нужно)
-		chromedp.Flag("ignore-certificate-errors", true),                                   // Игнорировать ошибки сертификатов
-		chromedp.Flag("window-size", "1200,800"),                                           // Размер окна
-		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"), // Кастомный User-Agent
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-software-rasterizer", true),
+		chromedp.Flag("disable-crash-reporter", true),
+		chromedp.Flag("no-crash-upload", true),
+		chromedp.Flag("disable-logging", true),
 	)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(ctx, opts...)
