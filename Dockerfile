@@ -18,7 +18,8 @@ WORKDIR /src
 # Leverage bind mounts to go.sum and go.mod to avoid having to copy them into
 # the container.
 
-RUN --mount=type=bind,source=go.sum,target=go.sum \
+RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod/ \
+    --mount=type=bind,source=go.sum,target=go.sum \
     --mount=type=bind,source=go.mod,target=go.mod \
     go mod download -x
 
@@ -32,7 +33,8 @@ ARG TARGETARCH
 # Leverage a bind mount to the current directory to avoid having to copy the
 # source code into the container.
 
-RUN --mount=type=bind,target=. \
+RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod/ \
+    --mount=type=bind,target=. \
     CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server . && \
     cp .env /tmp/.env
 
@@ -52,7 +54,9 @@ FROM alpine:latest AS final
 
 # Install any runtime dependencies that are needed to run your application.
 # Leverage a cache mount to /var/cache/apk/ to speed up subsequent builds.
-RUN apk --update add \
+
+RUN --mount=type=cache,id=apk-cache,target=/var/cache/apk \
+    apk --update add \
         ca-certificates \
         tzdata \
         chromium \
