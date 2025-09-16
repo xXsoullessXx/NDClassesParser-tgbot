@@ -2,7 +2,7 @@
 
 A Telegram bot that helps students track class availability at the University of Notre Dame by monitoring CRNs (Course Reference Numbers).
 
-#Host
+# Host
 
 It's hosted. Username in tg: @SoullessovichBot
 
