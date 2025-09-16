@@ -22,24 +22,47 @@ type Parser struct {
 func New(logger *logger.Logger) Parser {
 	return Parser{
 		client:  web.New(),
-		timeout: 30 * time.Second, // Default timeout of 30 seconds
+		timeout: 60 * time.Second, // Default timeout of 60 seconds for Railway
 		logger:  logger,
 	}
 }
 
 // SearchClass searches for a class by CRN
 func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
-	headless := !p.logger.IsDebugMode() // Headless in normal mode, visible in debug mode
+	// Simplified Chrome configuration for Railway
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", headless),                                                // Show browser in debug mode
-		chromedp.Flag("disable-gpu", false),                                                // Включить GPU (если нужно)
-		chromedp.Flag("ignore-certificate-errors", true),                                   // Игнорировать ошибки сертификатов
-		chromedp.Flag("window-size", "1200,800"),                                           // Размер окна
-		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"), // Кастомный User-Agent
+		chromedp.Flag("headless", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-setuid-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("disable-web-security", true),
+		chromedp.Flag("disable-features", "VizDisplayCompositor"),
+		chromedp.Flag("remote-debugging-port", "0"),
+		chromedp.Flag("disable-logging", true),
+		chromedp.Flag("disable-crash-reporter", true),
+		chromedp.Flag("disable-breakpad", true),
+		chromedp.Flag("disable-crashpad", true),
+		chromedp.Flag("no-crash-upload", true),
+		chromedp.Flag("user-data-dir", "/tmp/chrome-user-data"),
+		chromedp.Flag("disable-background-networking", true),
+		chromedp.Flag("disable-default-apps", true),
+		chromedp.Flag("disable-sync", true),
+		chromedp.Flag("disable-translate", true),
+		chromedp.Flag("disable-component-update", true),
 	)
 
+	// Try direct Chrome path first, fallback to wrapper if needed
+	opts = append(opts, chromedp.ExecPath("/usr/bin/chromium-browser"))
+
+	// Add essential environment variables
+	opts = append(opts, chromedp.Env("DISPLAY", ":99"))
+
+	p.logger.Info("Creating Chrome allocator context for CRN: %s", crn)
 	allocCtx, cancel := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancel()
+
+	p.logger.Info("Creating Chrome context for CRN: %s", crn)
 	// Create a new chromedp context
 	var newCtx context.Context
 	if p.logger.IsDebugMode() {
@@ -52,9 +75,39 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	ctx = newCtx
 	defer cancel()
 
-	// Adding timeout to context
+	p.logger.Info("Chrome context created successfully for CRN: %s", crn)
+
+	// Test Chrome startup with a simple operation first
+	p.logger.Info("Testing Chrome startup for CRN: %s", crn)
+	testCtx, testCancel := context.WithTimeout(ctx, 20*time.Second)
+	defer testCancel()
+
+	testErr := chromedp.Run(testCtx,
+		chromedp.Navigate("about:blank"),
+		chromedp.Sleep(2*time.Second),
+	)
+	if testErr != nil {
+		p.logger.Error("Chrome startup test failed for CRN %s: %v", crn, testErr)
+		p.logger.Error("Chrome startup test error type: %T", testErr)
+		return nil, fmt.Errorf("Chrome failed to start: %w", testErr)
+	}
+	p.logger.Info("Chrome startup test successful for CRN: %s", crn)
+
+	// Test navigation to a simple page first
+	p.logger.Info("Testing navigation to Google for CRN: %s", crn)
+	navCtx, navCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer navCancel()
+
+	navErr := chromedp.Run(navCtx, chromedp.Navigate("https://www.google.com"))
+	if navErr != nil {
+		p.logger.Error("Navigation test failed for CRN %s: %v", crn, navErr)
+		return nil, fmt.Errorf("Chrome navigation test failed: %w", navErr)
+	}
+	p.logger.Info("Navigation test successful for CRN: %s", crn)
+
+	// Adding timeout to context - reduced for Railway environment
 	p.logger.Debug("Before WithTimeout, ctx is done: %v", ctx.Err() != nil)
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel = context.WithTimeout(ctx, 90*time.Second) // Reduced to 90 seconds for Railway
 	p.logger.Debug("After WithTimeout on ctx, ctx is done: %v", ctx.Err() != nil)
 	defer cancel()
 
@@ -66,48 +119,186 @@ func (p *Parser) SearchClass(ctx context.Context, crn string) (*Class, error) {
 	var seatsStr string
 
 	p.logger.Debug("Before chromedp.Run, ctx is done: %v", ctx.Err() != nil)
-	err := chromedp.Run(ctx,
-		// Navigate to the term selection page
-		chromedp.Navigate(termURL),
+	p.logger.Info("Starting Chrome automation for CRN: %s", crn)
 
-		// Wait for page to load
-		chromedp.Sleep(14*time.Second),
+	p.logger.Debug("Starting Chrome automation steps for CRN: %s", crn)
 
-		// Click on the term selection input
-		chromedp.Click(`#s2id_txt_term`, chromedp.ByID),
+	// Step 1: Navigate to the page
+	p.logger.Info("Step 1: Navigating to term selection page for CRN: %s", crn)
+	p.logger.Debug("Context status before Step 1: %v", ctx.Err())
+	err := chromedp.Run(ctx, chromedp.Navigate(termURL))
+	if err != nil {
+		p.logger.Error("Step 1 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to navigate to page: %w", err)
+	}
+	p.logger.Info("Step 1 completed for CRN: %s", crn)
 
-		// Wait for the term selection input to be ready
+	// Step 2: Wait for page load
+	p.logger.Info("Step 2: Waiting for page load for CRN: %s", crn)
+	p.logger.Debug("Context status before Step 2: %v", ctx.Err())
+	err = chromedp.Run(ctx, chromedp.Sleep(8*time.Second)) // Reduced from 10 to 8 seconds
+	if err != nil {
+		p.logger.Error("Step 2 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to wait for page load: %w", err)
+	}
+	p.logger.Info("Step 2 completed for CRN: %s", crn)
+
+	// Step 3: Click term selection
+	p.logger.Info("Step 3: Clicking term selection for CRN: %s", crn)
+	err = chromedp.Run(ctx, chromedp.Click(`#s2id_txt_term`, chromedp.ByID))
+	if err != nil {
+		p.logger.Error("Step 3 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to click term selection: %w", err)
+	}
+	p.logger.Info("Step 3 completed for CRN: %s", crn)
+
+	// Step 4: Wait and fill term
+	p.logger.Info("Step 4: Filling term selection for CRN: %s", crn)
+	err = chromedp.Run(ctx,
 		chromedp.Sleep(2*time.Second),
-
-		// Fill in "Fall Semester 2025" in the term selection field
 		chromedp.SendKeys(`#s2id_autogen1_search`, "Fall Semester 2025", chromedp.ByID),
 		chromedp.Sleep(1*time.Second),
 		chromedp.SendKeys(`#s2id_autogen1_search`, "\n", chromedp.ByID),
+	)
+	if err != nil {
+		p.logger.Error("Step 4 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to fill term selection: %w", err)
+	}
+	p.logger.Info("Step 4 completed for CRN: %s", crn)
 
-		// Click the search button
-		chromedp.Click(`#term-go`, chromedp.ByID),
+	// Step 5: Click search button
+	p.logger.Info("Step 5: Clicking search button for CRN: %s", crn)
+	err = chromedp.Run(ctx, chromedp.Click(`#term-go`, chromedp.ByID))
+	if err != nil {
+		p.logger.Error("Step 5 failed for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to click search button: %w", err)
+	}
+	p.logger.Info("Step 5 completed for CRN: %s", crn)
 
-		// Wait for the keyword input to be ready
-		chromedp.WaitVisible(`#txt_keywordlike`, chromedp.ByID),
+	// Wait a bit longer for the page to load the keyword input field
+	p.logger.Debug("Waiting for page to load keyword input field for CRN: %s", crn)
+	p.logger.Debug("Context status before wait: %v", ctx.Err())
 
-		// Fill in the CRN in the keyword field
-		chromedp.SendKeys(`#txt_keywordlike`, crn, chromedp.ByID),
+	// Use shorter wait time to avoid context cancellation
+	err = chromedp.Run(ctx, chromedp.Sleep(2*time.Second))
+	if err != nil {
+		p.logger.Error("Wait after Step 5 failed for CRN %s: %v", crn, err)
+		p.logger.Error("Context status after wait failure: %v", ctx.Err())
+		return nil, fmt.Errorf("failed to wait after search: %w", err)
+	}
 
-		// Wait a bit and click the search button again
+	p.logger.Debug("Context status after wait: %v", ctx.Err())
+
+	// Step 6: Wait for keyword input and fill CRN
+	p.logger.Info("Step 6: Filling CRN field for CRN: %s", crn)
+
+	// Create a shorter timeout for this step
+	step6Ctx, step6Cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer step6Cancel()
+
+	// Try to wait for the element with a timeout
+	p.logger.Debug("Waiting for keyword input field to be visible for CRN: %s", crn)
+	err = chromedp.Run(step6Ctx, chromedp.WaitVisible(`#txt_keywordlike`, chromedp.ByID))
+	if err != nil {
+		p.logger.Error("Keyword input field not visible for CRN %s: %v", crn, err)
+		// Try alternative selector
+		p.logger.Info("Trying alternative selector for CRN: %s", crn)
+		err = chromedp.Run(step6Ctx, chromedp.WaitVisible(`input[name="keywordlike"]`, chromedp.ByQuery))
+		if err != nil {
+			p.logger.Error("Alternative selector also failed for CRN %s: %v", crn, err)
+			return nil, fmt.Errorf("keyword input field not found: %w", err)
+		}
+		p.logger.Info("Alternative selector worked for CRN: %s", crn)
+	}
+
+	// Fill CRN field
+	p.logger.Debug("Filling CRN field for CRN: %s", crn)
+	err = chromedp.Run(step6Ctx, chromedp.SendKeys(`#txt_keywordlike`, crn, chromedp.ByID))
+	if err != nil {
+		p.logger.Error("Failed to fill CRN field for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to fill CRN field: %w", err)
+	}
+
+	// Click search button
+	p.logger.Debug("Clicking search button for CRN: %s", crn)
+	err = chromedp.Run(step6Ctx,
 		chromedp.Sleep(1*time.Second),
 		chromedp.Click(`#search-go`, chromedp.ByID),
-
-		// Wait for results to load
-		chromedp.Sleep(3*time.Second),
-
-		// Extract class information
-		chromedp.Text(`[data-content="Title"]`, &class.Title, chromedp.ByQuery),
-		chromedp.Text(`[data-content="Status"]`, &seatsStr, chromedp.ByQuery),
 	)
-	p.logger.Debug("After chromedp.Run, ctx is done: %v, err: %v", ctx.Err() != nil, err)
-
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse class information: %w", err)
+		p.logger.Error("Failed to click search button for CRN %s: %v", crn, err)
+		return nil, fmt.Errorf("failed to click search button: %w", err)
+	}
+
+	p.logger.Info("Step 6 completed for CRN: %s", crn)
+
+	// Step 7: Wait for results and extract data
+	p.logger.Info("Step 7: Extracting class data for CRN: %s", crn)
+	p.logger.Info("Context status before Step 7: %v", ctx.Err())
+
+	// Create a very short timeout for this step
+	step7Ctx, step7Cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer step7Cancel()
+
+	// Skip the sleep and go directly to extraction
+	p.logger.Info("Attempting immediate data extraction for CRN: %s", crn)
+
+	// Debug: Get page title to see if we're on the right page
+	var pageTitle string
+	chromedp.Run(step7Ctx, chromedp.Title(&pageTitle))
+	p.logger.Info("Page title for CRN %s: %s", crn, pageTitle)
+
+	// Try to extract title with fallback selectors
+	p.logger.Info("Extracting class title for CRN: %s", crn)
+	titleCtx, titleCancel := context.WithTimeout(step7Ctx, 5*time.Second)
+	defer titleCancel()
+
+	err = chromedp.Run(titleCtx, chromedp.Text(`[data-content="Title"]`, &class.Title, chromedp.ByQuery))
+	if err != nil {
+		p.logger.Error("Primary title selector failed for CRN %s: %v", crn, err)
+		// Try alternative selectors
+		p.logger.Info("Trying alternative title selectors for CRN: %s", crn)
+		err = chromedp.Run(titleCtx, chromedp.Text(`.title`, &class.Title, chromedp.ByQuery))
+		if err != nil {
+			p.logger.Error("Alternative title selector failed for CRN %s: %v", crn, err)
+			// Set default title
+			class.Title = "Unknown Class"
+			p.logger.Info("Using default title for CRN: %s", crn)
+		}
+	}
+
+	// Try to extract seats with fallback selectors
+	p.logger.Debug("Extracting seats data for CRN: %s", crn)
+	seatsCtx, seatsCancel := context.WithTimeout(step7Ctx, 5*time.Second)
+	defer seatsCancel()
+
+	err = chromedp.Run(seatsCtx, chromedp.Text(`[data-content="Status"]`, &seatsStr, chromedp.ByQuery))
+	if err != nil {
+		p.logger.Error("Primary seats selector failed for CRN %s: %v", crn, err)
+		// Try alternative selectors
+		p.logger.Info("Trying alternative seats selectors for CRN: %s", crn)
+		err = chromedp.Run(seatsCtx, chromedp.Text(`.seats`, &seatsStr, chromedp.ByQuery))
+		if err != nil {
+			p.logger.Error("Alternative seats selector failed for CRN %s: %v", crn, err)
+			// Set default seats
+			seatsStr = "0"
+			p.logger.Info("Using default seats for CRN: %s", crn)
+		}
+	}
+
+	p.logger.Info("Step 7 completed for CRN: %s", crn)
+
+	p.logger.Debug("All Chrome automation steps completed for CRN: %s", crn)
+
+	// Check if context was canceled
+	if ctx.Err() == context.Canceled {
+		p.logger.Error("Context was canceled during Chrome automation for CRN: %s", crn)
+		return nil, fmt.Errorf("operation was canceled: %w", ctx.Err())
+	}
+
+	if ctx.Err() == context.DeadlineExceeded {
+		p.logger.Error("Context deadline exceeded during Chrome automation for CRN: %s", crn)
+		return nil, fmt.Errorf("operation timed out: %w", ctx.Err())
 	}
 
 	// Convert string values to integers

@@ -124,7 +124,7 @@ func (d *Database) GetUserByID(id int64) (*User, error) {
 }
 
 // AddTrackedCRN adds a CRN to track for a user
-func (d *Database) AddTrackedCRN(userID int64, crn string, title string) (*TrackedCRN, error) {
+func (d *Database) AddTrackedCRN(userID int64, crn string, title string) (*TrackedCRN, bool, error) {
 	trackedCRN := &TrackedCRN{
 		UserID:    userID,
 		CRN:       crn,
@@ -135,25 +135,46 @@ func (d *Database) AddTrackedCRN(userID int64, crn string, title string) (*Track
 
 	result := d.DB.FirstOrCreate(trackedCRN, TrackedCRN{UserID: userID, CRN: crn})
 	if result.Error != nil {
-		return nil, result.Error
+		return nil, false, result.Error
 	}
 
+	wasInactive := false
 	// If the record already existed but was inactive, reactivate it
 	if !trackedCRN.Active {
 		result = d.DB.Model(trackedCRN).Update("active", true)
 		if result.Error != nil {
-			return nil, result.Error
+			return nil, false, result.Error
 		}
 		trackedCRN.Active = true
+		wasInactive = true
 	}
 
-	return trackedCRN, nil
+	// Check if this was a new record or existing active record
+	isNew := result.RowsAffected > 0 && !wasInactive
+
+	return trackedCRN, isNew, nil
 }
 
 // RemoveTrackedCRN removes a CRN from tracking for a user
-func (d *Database) RemoveTrackedCRN(userID int64, crn string) error {
-	result := d.DB.Model(&TrackedCRN{}).Where("user_id = ? AND crn = ?", userID, crn).Update("active", false)
-	return result.Error
+func (d *Database) RemoveTrackedCRN(userID int64, crn string) (bool, error) {
+	// First check if the CRN exists and is active
+	var existingCRN TrackedCRN
+	result := d.DB.Where("user_id = ? AND crn = ? AND active = ?", userID, crn, true).First(&existingCRN)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			// CRN is not being tracked
+			return false, nil
+		}
+		return false, result.Error
+	}
+
+	// CRN exists and is active, now remove it
+	result = d.DB.Model(&TrackedCRN{}).Where("user_id = ? AND crn = ?", userID, crn).Update("active", false)
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return true, nil
 }
 
 // GetUserTrackedCRNs retrieves all active CRNs tracked by a user
