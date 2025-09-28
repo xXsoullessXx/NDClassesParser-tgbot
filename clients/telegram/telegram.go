@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -97,9 +98,16 @@ func (c *Client) SendMessage(chatID int64, text string) error {
 }
 
 func (c *Client) doRequest(ctx context.Context, method string, query url.Values) ([]byte, error) {
+	scheme := "https"
+	host := c.host
+	if strings.HasPrefix(c.host, "http://") {
+		scheme = "http"
+		host = strings.TrimPrefix(c.host, "http://")
+	}
+
 	url := url.URL{
-		Scheme: "https",
-		Host:   c.host,
+		Scheme: scheme,
+		Host:   host,
 		Path:   path.Join(c.basePath, method),
 	}
 	const errMsg = "can't do request: %w"
